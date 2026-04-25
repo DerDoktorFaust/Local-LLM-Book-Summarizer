@@ -10,11 +10,18 @@ def summarize_chunk(chunk):
     prompt = f"""
 Summarize the following text from pages {chunk['start_page']}–{chunk['end_page']}.
 
-Focus on:
-- Main argument
-- Key evidence
-- Important concepts
-- Relevance for a historian
+Requirements:
+- Do NOT generalize beyond what is stated
+- Do NOT strengthen claims (avoid words like "collapse," "complete," "entirely" unless explicit)
+- Stay close to the author’s actual argument and language
+- Be precise rather than sweeping
+
+Include:
+- Main claim in this section
+- 2–3 specific pieces of evidence (with details, not generalities)
+- Any key terms or concepts introduced
+
+If unsure, hedge rather than assert.
 
 Text:
 {chunk['text']}
@@ -22,12 +29,113 @@ Text:
     return generate(prompt)
 
 
-def write_markdown_output(final_summary, chunk_summaries, output_path):
+def synthesize_batches(chunk_summaries, batch_size=6):
+    batch_summaries = []
+
+    for i in range(0, len(chunk_summaries), batch_size):
+        batch = chunk_summaries[i:i + batch_size]
+
+        combined = "\n\n".join(
+            [
+                f"Pages {s['chunk']['start_page']}–{s['chunk']['end_page']}:\n{s['summary']}"
+                for s in batch
+            ]
+        )
+
+        prompt = f"""
+The following are summaries of consecutive chunks from a book/article.
+
+Produce a conservative intermediate synthesis.
+
+STRICT REQUIREMENTS:
+
+- Do NOT exaggerate or extend the author's claims
+- Do NOT make the argument cleaner or more linear than the summaries support
+- Avoid words like "collapse," "complete," "entirely," or "proves" unless explicitly supported
+- Preserve ambiguity, tension, contradiction, and uncertainty
+- If unsure, hedge rather than assert
+- Keep page ranges attached to claims whenever possible
+
+Include:
+
+- Main claim across these chunks
+- Argument progression, if clearly present
+- 3–5 specific pieces of evidence
+- Key terms or concepts
+- Tensions, qualifications, or limits in the argument
+- Page ranges to revisit
+
+If unsure, hedge rather than assert.
+
+Chunk summaries:
+{combined}
+"""
+
+        batch_summary = generate(prompt)
+
+        start_page = batch[0]["chunk"]["start_page"]
+        end_page = batch[-1]["chunk"]["end_page"]
+
+        batch_summaries.append({
+            "start_page": start_page,
+            "end_page": end_page,
+            "summary": batch_summary
+        })
+
+    return batch_summaries
+
+
+def synthesize_final_summary(batch_summaries):
+    combined = "\n\n".join(
+        [
+            f"Pages {b['start_page']}–{b['end_page']}:\n{b['summary']}"
+            for b in batch_summaries
+        ]
+    )
+
+    prompt = f"""
+Based on the following intermediate summaries, produce an analytical summary of the entire work.
+
+STRICT REQUIREMENTS:
+
+- Do NOT exaggerate or extend the author’s claims
+- Avoid words like "collapse," "complete," "entirely," unless explicitly supported
+- Preserve ambiguity, tension, and contradiction where they exist
+- Do NOT impose an overly clean or linear structure if the argument is messy
+
+Include:
+
+- One-sentence thesis (accurate, not inflated)
+- Main argument
+- Structure of the argument (only if clearly present)
+- At least 3 specific pieces of evidence from the text
+- Key concepts (use the author’s terms where possible)
+- Historiographical contribution (precisely stated)
+
+Be conservative, precise, and text-faithful rather than elegant. If unsure, hedge rather than assert.
+
+Intermediate summaries:
+{combined}
+"""
+
+    return generate(prompt)
+
+
+def write_markdown_output(final_summary, batch_summaries, chunk_summaries, output_path):
     lines = []
 
     lines.append("# Book Summary\n")
     lines.append(final_summary)
     lines.append("\n---\n")
+
+    lines.append("## Intermediate Batch Summaries\n")
+
+    for i, batch in enumerate(batch_summaries, start=1):
+        lines.append(
+            f"### Batch {i}: Pages {batch['start_page']}–{batch['end_page']}\n"
+        )
+        lines.append(batch["summary"])
+        lines.append("\n---\n")
 
     lines.append("## Chunk Summaries\n")
 
@@ -115,37 +223,32 @@ def main():
         print(f"Slowest chunk: {max(chunk_times):.2f}s")
         print(f"Fastest chunk: {min(chunk_times):.2f}s")
 
-    combined = "\n\n".join(
-        [
-            f"Pages {s['chunk']['start_page']}–{s['chunk']['end_page']}:\n{s['summary'][:1500]}"
-            for s in chunk_summaries
-        ]
-    )
+    print("\nSynthesizing batch summaries...")
 
-    final_prompt = f"""
-Based on the following page-referenced chunk summaries, produce a coherent analytical summary of the entire book.
-
-Include:
-- One-sentence thesis
-- Main argument
-- Chapter or section structure if apparent
-- Key evidence
-- Important concepts
-- Historiographical significance
-- Strengths and weaknesses
-- Questions for further reading
-
-Chunk summaries:
-{combined}
-"""
+    try:
+        batch_summaries = synthesize_batches(chunk_summaries, batch_size=6)
+        print(f"Created {len(batch_summaries)} intermediate summaries")
+    except Exception as e:
+        print(f"Error generating batch summaries: {e}")
+        batch_summaries = []
+        errors += 1
 
     print("\nGenerating final book summary...")
-    
+
     try:
-        final_summary = generate(final_prompt)
+        if batch_summaries:
+            final_summary = synthesize_final_summary(batch_summaries)
+        else:
+            final_summary = (
+                "Final book-level summary failed because no batch summaries were created. "
+                "Chunk summaries were still generated successfully."
+            )
     except Exception as e:
         print(f"Error generating final summary: {e}")
-        final_summary = "Final book level summary failed. Chunk summaries were still generated successfully."
+        final_summary = (
+            "Final book-level summary failed. "
+            "Chunk summaries and any completed batch summaries were still generated successfully."
+        )
         errors += 1
 
     final_length = len(final_summary)
@@ -153,7 +256,12 @@ Chunk summaries:
     print("\n--- Output ---")
     print(f"Final summary length (chars): {final_length}")
 
-    write_markdown_output(final_summary, chunk_summaries, output_path)
+    write_markdown_output(
+        final_summary=final_summary,
+        batch_summaries=batch_summaries,
+        chunk_summaries=chunk_summaries,
+        output_path=output_path
+    )
 
     total_time = time.time() - start_time
     tokens_per_sec = est_tokens / total_time if total_time > 0 else 0
