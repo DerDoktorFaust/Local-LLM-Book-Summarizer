@@ -3,7 +3,7 @@ import json
 
 def generate(prompt, url="http://127.0.0.1:1234/v1/chat/completions"):
     payload = {
-        "model": "google/gemma-4-e4b",
+        "model": "google/gemma-3-12b",
         "messages": [
             {"role": "user", "content": prompt}
         ],
