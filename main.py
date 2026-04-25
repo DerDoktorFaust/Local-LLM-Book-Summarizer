@@ -56,7 +56,7 @@ def extract_compressed_notes(summary):
     return summary[:1200].strip()
 
 
-def synthesize_batches(chunk_summaries, batch_size=8):
+def synthesize_batches(chunk_summaries, batch_size=6):
     batch_summaries = []
 
     for i in range(0, len(chunk_summaries), batch_size):
@@ -308,7 +308,7 @@ def main():
     print("\nSynthesizing batch summaries...")
 
     try:
-        batch_summaries = synthesize_batches(chunk_summaries, batch_size=8)
+        batch_summaries = synthesize_batches(chunk_summaries, batch_size=6)
         print(f"Created {len(batch_summaries)} intermediate summaries")
     except Exception as e:
         print(f"Error generating batch summaries: {e}")
