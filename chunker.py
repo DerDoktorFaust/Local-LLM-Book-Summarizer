@@ -1,7 +1,7 @@
 def estimate_tokens(text):
     return int(len(text.split()) * 1.3)
 
-def chunk_pages(pages, max_tokens=2000):
+def chunk_pages(pages, max_tokens=2500):
     chunks = []
     current_text = []
     current_pages = []
