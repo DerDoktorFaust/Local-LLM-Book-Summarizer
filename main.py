@@ -3,7 +3,7 @@ from pathlib import Path
 
 from extractor import extract_pages
 from chunker import chunk_pages
-from llm import generate
+from llm import load_model, generate_text, unload_model
 
 
 def summarize_chunk(chunk):
@@ -31,7 +31,6 @@ Include:
 - Any tensions, qualifications, or limits in the argument
 
 ## Compressed Notes
-
 Maximum 150 words.
 
 Include:
@@ -44,7 +43,7 @@ Include:
 Text:
 {chunk['text']}
 """
-    return generate(prompt)
+    return generate_text(prompt)
 
 
 def extract_compressed_notes(summary):
@@ -63,13 +62,9 @@ def synthesize_batches(chunk_summaries, batch_size=6):
         batch = chunk_summaries[i:i + batch_size]
 
         combined = "\n\n".join(
-            [
-                (
-                    f"Pages {s['chunk']['start_page']}–{s['chunk']['end_page']}:\n"
-                    f"{s['compressed_notes']}"
-                )
-                for s in batch
-            ]
+            f"Pages {s['chunk']['start_page']}–{s['chunk']['end_page']}:\n"
+            f"{s['compressed_notes']}"
+            for s in batch
         )
 
         prompt = f"""
@@ -98,15 +93,12 @@ Compressed notes:
 {combined}
 """
 
-        batch_summary = generate(prompt)
-
-        start_page = batch[0]["chunk"]["start_page"]
-        end_page = batch[-1]["chunk"]["end_page"]
+        batch_summary = generate_text(prompt)
 
         batch_summaries.append({
-            "start_page": start_page,
-            "end_page": end_page,
-            "summary": batch_summary
+            "start_page": batch[0]["chunk"]["start_page"],
+            "end_page": batch[-1]["chunk"]["end_page"],
+            "summary": batch_summary,
         })
 
     return batch_summaries
@@ -114,10 +106,8 @@ Compressed notes:
 
 def synthesize_final_summary(batch_summaries):
     combined = "\n\n".join(
-        [
-            f"Pages {b['start_page']}–{b['end_page']}:\n{b['summary']}"
-            for b in batch_summaries
-        ]
+        f"Pages {b['start_page']}–{b['end_page']}:\n{b['summary']}"
+        for b in batch_summaries
     )
 
     prompt = f"""
@@ -147,15 +137,13 @@ Intermediate summaries:
 {combined}
 """
 
-    return generate(prompt)
+    return generate_text(prompt)
 
 
 def verify_final_summary(final_summary, batch_summaries):
     combined = "\n\n".join(
-        [
-            f"Pages {b['start_page']}–{b['end_page']}:\n{b['summary']}"
-            for b in batch_summaries
-        ]
+        f"Pages {b['start_page']}–{b['end_page']}:\n{b['summary']}"
+        for b in batch_summaries
     )
 
     prompt = f"""
@@ -186,7 +174,7 @@ Intermediate summaries:
 {combined}
 """
 
-    return generate(prompt)
+    return generate_text(prompt)
 
 
 def write_markdown_output(
@@ -194,7 +182,7 @@ def write_markdown_output(
     verification_report,
     batch_summaries,
     chunk_summaries,
-    output_path
+    output_path,
 ):
     lines = []
 
@@ -211,9 +199,7 @@ def write_markdown_output(
     lines.append("## Intermediate Batch Summaries\n")
 
     for i, batch in enumerate(batch_summaries, start=1):
-        lines.append(
-            f"### Batch {i}: Pages {batch['start_page']}–{batch['end_page']}\n"
-        )
+        lines.append(f"### Batch {i}: Pages {batch['start_page']}–{batch['end_page']}\n")
         lines.append(batch["summary"])
         lines.append("\n---\n")
 
@@ -237,143 +223,144 @@ def main():
     pdf_path = Path("book.pdf")
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
-
     output_path = output_dir / "book_summary.md"
 
-    print("Extracting...")
-    pages = extract_pages(pdf_path)
+    try:
+        print("Extracting...")
+        pages = extract_pages(pdf_path)
 
-    print("Chunking...")
-    chunks = chunk_pages(pages)
+        print("Chunking...")
+        chunks = chunk_pages(pages)
 
-    total_pages = len(pages)
-    total_chunks = len(chunks)
-    total_chars = sum(len(c["text"]) for c in chunks)
-    est_tokens = int(total_chars / 4)
+        total_pages = len(pages)
+        total_chunks = len(chunks)
+        total_chars = sum(len(c["text"]) for c in chunks)
+        est_tokens = int(total_chars / 4)
 
-    print("\n--- Pipeline Stats ---")
-    print(f"Pages: {total_pages}")
-    print(f"Chunks: {total_chunks}")
-    print(f"Estimated tokens: {est_tokens}")
+        print("\n--- Pipeline Stats ---")
+        print(f"Pages: {total_pages}")
+        print(f"Chunks: {total_chunks}")
+        print(f"Estimated tokens: {est_tokens}")
 
-    if chunks:
+        if not chunks:
+            print("No chunks created. Exiting.")
+            return
+
         chunk_lengths = [len(c["text"]) for c in chunks]
 
         print("\n--- Chunk Stats ---")
         print(f"Avg chars per chunk: {sum(chunk_lengths) // len(chunk_lengths)}")
         print(f"Min chars: {min(chunk_lengths)}")
         print(f"Max chars: {max(chunk_lengths)}")
-    else:
-        print("No chunks created. Exiting.")
-        return
 
-    chunk_summaries = []
-    chunk_times = []
+        print("\nLoading LLM once for entire run...")
+        load_model()
 
-    for i, chunk in enumerate(chunks):
-        chunk_start = time.time()
+        chunk_summaries = []
+        chunk_times = []
 
-        print(f"\nSummarizing chunk {i + 1}/{len(chunks)}...")
+        for i, chunk in enumerate(chunks):
+            chunk_start = time.time()
+
+            print(f"\nSummarizing chunk {i + 1}/{len(chunks)}...")
+
+            try:
+                summary = summarize_chunk(chunk)
+                compressed_notes = extract_compressed_notes(summary)
+            except Exception as e:
+                print(f"Error on chunk {i + 1}: {e}")
+                errors += 1
+                continue
+
+            chunk_time = time.time() - chunk_start
+            chunk_times.append(chunk_time)
+
+            print(f"Chunk {i + 1} took {chunk_time:.2f} seconds")
+
+            chunk_summaries.append({
+                "chunk": chunk,
+                "summary": summary,
+                "compressed_notes": compressed_notes,
+            })
+
+        if not chunk_summaries:
+            print("\nNo chunk summaries created. Exiting.")
+            print(f"Errors: {errors}")
+            return
+
+        if chunk_times:
+            print("\n--- LLM Timing ---")
+            print(f"Avg chunk time: {sum(chunk_times) / len(chunk_times):.2f}s")
+            print(f"Slowest chunk: {max(chunk_times):.2f}s")
+            print(f"Fastest chunk: {min(chunk_times):.2f}s")
+
+        print("\nSynthesizing batch summaries...")
 
         try:
-            summary = summarize_chunk(chunk)
-            compressed_notes = extract_compressed_notes(summary)
+            batch_summaries = synthesize_batches(chunk_summaries, batch_size=6)
+            print(f"Created {len(batch_summaries)} intermediate summaries")
         except Exception as e:
-            print(f"Error on chunk {i + 1}: {e}")
+            print(f"Error generating batch summaries: {e}")
+            batch_summaries = []
             errors += 1
-            continue
 
-        chunk_time = time.time() - chunk_start
-        chunk_times.append(chunk_time)
+        print("\nGenerating final book summary...")
 
-        print(f"Chunk {i + 1} took {chunk_time:.2f} seconds")
-
-        chunk_summaries.append({
-            "chunk": chunk,
-            "summary": summary,
-            "compressed_notes": compressed_notes
-        })
-
-    if not chunk_summaries:
-        print("\nNo chunk summaries created. Exiting.")
-        print(f"Errors: {errors}")
-        return
-
-    if chunk_times:
-        print("\n--- LLM Timing ---")
-        print(f"Avg chunk time: {sum(chunk_times) / len(chunk_times):.2f}s")
-        print(f"Slowest chunk: {max(chunk_times):.2f}s")
-        print(f"Fastest chunk: {min(chunk_times):.2f}s")
-
-    print("\nSynthesizing batch summaries...")
-
-    try:
-        batch_summaries = synthesize_batches(chunk_summaries, batch_size=6)
-        print(f"Created {len(batch_summaries)} intermediate summaries")
-    except Exception as e:
-        print(f"Error generating batch summaries: {e}")
-        batch_summaries = []
-        errors += 1
-
-    print("\nGenerating final book summary...")
-
-    try:
-        if batch_summaries:
-            final_summary = synthesize_final_summary(batch_summaries)
-        else:
+        try:
+            if batch_summaries:
+                final_summary = synthesize_final_summary(batch_summaries)
+            else:
+                final_summary = (
+                    "Final book-level summary failed because no batch summaries were created. "
+                    "Chunk summaries were still generated successfully."
+                )
+        except Exception as e:
+            print(f"Error generating final summary: {e}")
             final_summary = (
-                "Final book-level summary failed because no batch summaries were created. "
-                "Chunk summaries were still generated successfully."
+                "Final book-level summary failed. "
+                "Chunk summaries and any completed batch summaries were still generated successfully."
             )
-    except Exception as e:
-        print(f"Error generating final summary: {e}")
-        final_summary = (
-            "Final book-level summary failed. "
-            "Chunk summaries and any completed batch summaries were still generated successfully."
-        )
-        errors += 1
+            errors += 1
 
-    print("\nVerifying final summary...")
+        print("\nVerifying final summary...")
 
-    try:
-        if batch_summaries:
-            verification_report = verify_final_summary(final_summary, batch_summaries)
-        else:
+        try:
+            if batch_summaries:
+                verification_report = verify_final_summary(final_summary, batch_summaries)
+            else:
+                verification_report = "Verification skipped because no batch summaries were created."
+        except Exception as e:
+            print(f"Error verifying final summary: {e}")
             verification_report = (
-                "Verification skipped because no batch summaries were created."
+                "Verification failed. Review the final summary against the chunk and batch summaries manually."
             )
-    except Exception as e:
-        print(f"Error verifying final summary: {e}")
-        verification_report = (
-            "Verification failed. Review the final summary against the chunk and batch summaries manually."
+            errors += 1
+
+        print("\n--- Output ---")
+        print(f"Final summary length (chars): {len(final_summary)}")
+
+        write_markdown_output(
+            final_summary=final_summary,
+            verification_report=verification_report,
+            batch_summaries=batch_summaries,
+            chunk_summaries=chunk_summaries,
+            output_path=output_path,
         )
-        errors += 1
 
-    final_length = len(final_summary)
+        total_time = time.time() - start_time
+        tokens_per_sec = est_tokens / total_time if total_time > 0 else 0
 
-    print("\n--- Output ---")
-    print(f"Final summary length (chars): {final_length}")
+        minutes = int(total_time // 60)
+        seconds = int(total_time % 60)
 
-    write_markdown_output(
-        final_summary=final_summary,
-        verification_report=verification_report,
-        batch_summaries=batch_summaries,
-        chunk_summaries=chunk_summaries,
-        output_path=output_path
-    )
+        print("\n--- Throughput ---")
+        print(f"Tokens/sec (est): {tokens_per_sec:.2f}")
+        print(f"\nErrors: {errors}")
+        print(f"Markdown summary saved to: {output_path}")
+        print(f"Total processing time: {minutes} min {seconds} sec")
 
-    total_time = time.time() - start_time
-    tokens_per_sec = est_tokens / total_time if total_time > 0 else 0
-
-    minutes = int(total_time // 60)
-    seconds = int(total_time % 60)
-
-    print("\n--- Throughput ---")
-    print(f"Tokens/sec (est): {tokens_per_sec:.2f}")
-
-    print(f"\nErrors: {errors}")
-    print(f"Markdown summary saved to: {output_path}")
-    print(f"Total processing time: {minutes} min {seconds} sec")
+    finally:
+        unload_model()
 
 
 if __name__ == "__main__":
