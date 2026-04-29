@@ -1,3 +1,4 @@
+import argparse
 import time
 from pathlib import Path
 
@@ -19,11 +20,34 @@ from summarizer import (
 from writer import write_markdown_output
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Local LLM Book & Article Summarizer"
+    )
+
+    parser.add_argument(
+        "pdf",
+        type=str,
+        help="Path to the input PDF file",
+    )
+
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     start_time = time.time()
     errors = 0
 
-    pdf_path = Path("book.pdf")
+    pdf_path = Path(args.pdf)
+
+    if not pdf_path.exists():
+        raise FileNotFoundError(f"File not found: {pdf_path}")
+
+    if pdf_path.suffix.lower() != ".pdf":
+        raise ValueError(f"Input file must be a PDF: {pdf_path}")
+
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
 
@@ -34,7 +58,7 @@ def main():
         total_pages = len(pages)
         document_type = classify_document(total_pages)
 
-        output_path = output_dir / f"{document_type}_summary.md"
+        output_path = output_dir / f"{pdf_path.stem}_{document_type}_summary.md"
 
         print(f"Document type: {document_type}")
 
@@ -46,6 +70,7 @@ def main():
         est_tokens = int(total_chars / 4)
 
         print("\n--- Pipeline Stats ---")
+        print(f"Input file: {pdf_path}")
         print(f"Pages: {total_pages}")
         print(f"Document type: {document_type}")
         print(f"Chunks: {total_chunks}")
@@ -192,6 +217,7 @@ def main():
             batch_summaries=batch_summaries,
             chunk_summaries=chunk_summaries,
             output_path=output_path,
+            document_type=document_type,
         )
 
         total_time = time.time() - start_time

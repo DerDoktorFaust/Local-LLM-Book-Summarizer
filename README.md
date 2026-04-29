@@ -168,25 +168,17 @@ pip install -r requirements.txt
 
 ## Usage
 
-### 1. Place your PDF
 
-Put your file in the project root and update `main.py`:
 
-```python
-pdf_path = Path("your_file.pdf")
-```
-
----
-
-### 2. Run the pipeline
+### 1. Run the pipeline
 
 ```bash
-python main.py
+python main.py yourfile.pdf
 ```
 
 ---
 
-### 3. Output
+### 2. Output
 
 Results will appear in:
 
