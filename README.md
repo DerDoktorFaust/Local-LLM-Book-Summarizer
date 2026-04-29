@@ -109,8 +109,18 @@ output/book_summary.md output/article_summary.md
 
 ## Project Structure
 
-book-summarizer/ ├── main.py          # Pipeline orchestration ├── llm.py           # Model loading and inference ├── summarizer.py    # Summarization logic ├── prompts.py       # All LLM prompts ├── writer.py        # Markdown output ├── extractor.py     # PDF text extraction ├── chunker.py       # Chunking logic ├── classifier.py    # (Planned) document classification ├── input/ ├── output/ └── requirements.txt
-
+book-summarizer/
+├── main.py          # Pipeline orchestration
+├── llm.py           # Model loading and inference
+├── summarizer.py    # Summarization logic
+├── prompts.py       # All LLM prompts
+├── writer.py        # Markdown output
+├── extractor.py     # PDF text extraction
+├── chunker.py       # Chunking logic
+├── classifier.py    # (Planned) document classification
+├── input/
+├── output/
+└── requirements.txt
 ---
 
 ## Installation
