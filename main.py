@@ -162,7 +162,7 @@ def main():
     if MODEL_PATH:
         logging.info(f"Model path: {MODEL_PATH}")
     else:
-        logging.info("Model path: not available from llm.py")
+        logging.info("Model path: not available from config.yaml")
 
     try:
         try:
@@ -231,7 +231,7 @@ def main():
             logging.exception("LLM loading failed.")
             logging.error(
                 "Clear error: The local model could not be loaded. "
-                "Check MODEL_PATH in llm.py, model compatibility, and available RAM."
+                "Check model_path in config.yaml, model compatibility, and available RAM."
             )
             logging.error(f"Original error: {e}")
             return

@@ -4,7 +4,10 @@ import mlx.core as mx
 from mlx_lm import load, generate
 
 
-MODEL_PATH = "/Users/cgoodwin/.lmstudio/models/mlx-community/gemma-3-12b-it-qat-4bit"
+from config_loader import load_config
+
+config = load_config()
+MODEL_PATH = config["model_path"]
 
 MAX_TOKENS = 2048
 
