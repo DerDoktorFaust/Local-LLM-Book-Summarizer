@@ -216,8 +216,7 @@ def main():
             verification_report=verification_report,
             batch_summaries=batch_summaries,
             chunk_summaries=chunk_summaries,
-            output_path=output_path,
-            document_type=document_type,
+            output_path=output_path
         )
 
         total_time = time.time() - start_time
