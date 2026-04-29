@@ -1,164 +1,239 @@
-# Local LLM Book Summarizer
+# Local LLM Book & Article Summarizer
 
 ## Purpose
-Summarizing entire books remains a challenging task for large language models. The first issue are context windows. Though frontier models have increased their window sizes, it remains that these models find it difficult to "hold everything together" after a certain point. Entire books with 100k or 250k tokens fit into massive new context windows of 1 million or more, but the models cannot handle it all without errors and hallucinations. The second issue involves copyright infringement. Uploading entire books to frontier models and their servers likely constitutes infringement. But personally owned PDF copies of books ingested by local large language models should present no issues as no data leaves the client computer.
 
-Local LLM Book Summarizer sidesteps these issues by running entirely on the client computer through a local LLM and "chunking" books into manageable pieces that can be summarized and then synthesized together.
+Summarizing long-form texts with large language models presents two core problems:
 
-## Project Workflow
+1. **Context limitations** – Even with large context windows, models struggle to maintain coherence across entire books.
+2. **Privacy and copyright concerns** – Uploading full texts to external APIs is often undesirable or legally questionable.
 
-### Overview
-
-This project processes full-length books (PDFs) into structured, research-grade summaries using a local LLM. It preserves argument structure, page references, and historiographical content rather than producing generic summaries.
+This project solves both by running entirely **locally** and using a **hierarchical summarization pipeline** that processes documents in structured stages.
 
 ---
 
-### Pipeline
+## Key Features
 
-#### 1. Input
-
-- OCR’d PDF of a book  
-- Assumes text is extractable (no image-only scans)
+- Fully local pipeline (no external API calls required)
+- Supports both **books and articles**
+- Automatic document classification (based on length)
+- Hierarchical summarization for long texts
+- Page-referenced outputs
+- Built-in verification pass to reduce hallucination and overstatement
+- Modular architecture for easy extension
 
 ---
 
-#### 2. Text Extraction
+## How It Works
 
-- Extract text page by page using PyMuPDF  
-- Preserve:
-  - Page numbers  
-  - Layout blocks (paragraphs, headings)  
+### 1. Input
 
-Output:
+- OCR’d PDF (text must be extractable)
+- Works best with clean, structured PDFs
+
+---
+
+### 2. Extraction
+
+- Uses PyMuPDF to extract text **page by page**
+- Preserves page boundaries for citation
+
+---
+
+### 3. Chunking
+
+- Splits text into manageable chunks
+- Each chunk includes:
+  - `start_page`
+  - `end_page`
+  - `text`
+
+---
+
+### 4. Document Classification
+
+The system automatically determines whether the PDF is:
+
+- **Article** (≤ ~80 pages)
+- **Book** (> ~80 pages)
+
+This decision controls the summarization pipeline.
+
+---
+
+### 5. Chunk-Level Summarization
+
+Each chunk is processed by a local LLM with strict constraints:
+
+- Conservative, text-faithful summaries
+- Explicit page references
+- No overgeneralization or inflated claims
+
+Each chunk produces:
+- Full summary
+- Compressed notes (used for synthesis)
+
+---
+
+### 6. Hierarchical Synthesis
+
+#### Articles
 
 ```
-Page → text blocks with metadata
+Chunks → Final Article Summary → Verification
+```
+
+#### Books
+
+```
+Chunks → Batch Summaries → Final Book Summary → Verification
+```
+
+Batching prevents loss of coherence across long texts.
+
+---
+
+### 7. Verification Pass
+
+A second LLM pass evaluates the final summary for:
+
+- Overstatements
+- Unsupported claims
+- Missing evidence
+- Incorrect structure
+
+This produces a **verification report**, not a rewrite.
+
+---
+
+### 8. Output
+
+Markdown file containing:
+
+- Final summary
+- Verification report
+- Intermediate batch summaries (books only)
+- All chunk summaries
+
+Example output:
+
+```
+output/book_summary.md
+output/article_summary.md
 ```
 
 ---
 
-#### 3. Structural Segmentation
-
-Chapter Detection
-- Prefer PDF Table of Contents (bookmarks)  
-- Fallback: regex detection (e.g., “Chapter 1”, “Introduction”)  
-
-Section Detection
-- Use layout features:
-  - Font size  
-  - Block length  
-  - Formatting patterns  
-
-Output:
+## Project Structure
 
 ```
-Book → Chapters → Sections
-```
-
----
-
-#### 4. Chunking
-
-- Split sections into chunks based on token limits  
-- Maintain structure:
-  - Chapter  
-  - Section  
-  - Page range  
-
-Output format (JSONL):
-
-```json
-{
-  "chapter": "Chapter 3",
-  "section": "The Dawes Plan",
-  "start_page": 145,
-  "end_page": 159,
-  "text": "..."
-}
+book-summarizer/
+├── main.py          # Pipeline orchestration
+├── llm.py           # Model loading and inference
+├── summarizer.py    # Summarization logic
+├── prompts.py       # All LLM prompts
+├── writer.py        # Markdown output
+├── extractor.py     # PDF text extraction
+├── chunker.py       # Chunking logic
+├── classifier.py    # Article vs book classification
+├── input/
+├── output/
+└── requirements.txt
 ```
 
 ---
 
-#### 5. Chunk-Level Analysis
+## Installation
 
-Each chunk is processed by a local LLM using a fixed schema:
+### 1. Clone the repository
 
-- Main claim  
-- Evidence  
-- Key concepts  
-- Examples/cases  
-- Historiographical intervention  
-- Method/source base  
-- Page references  
-- Questions/weaknesses  
+```bash
+git clone https://github.com/YOUR_USERNAME/book-summarizer.git
+cd book-summarizer
+```
 
----
+### 2. Create environment
 
-#### 6. Chapter Synthesis
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
-- Combine chunk outputs into a coherent chapter argument
-- Focus on:
-  - Argument progression  
-  - Evidence structure  
-  - Role within the book  
+### 3. Install dependencies
 
----
-
-#### 7. Book-Level Synthesis
-
-Generate a structured analytical summary:
-
-- One-sentence thesis  
-- Full argument  
-- Chapter breakdown  
-- Historiographical contribution  
-- Methods and sources  
-- Strengths and weaknesses
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
-#### 8. Critical Pass
+## Usage
 
-Second LLM pass to evaluate:
+### 1. Place your PDF
 
-- Assumptions  
-- Silences  
-- Limitations  
-- Historiographical stakes  
+Put your file in the project root and update `main.py`:
 
----
-
-### Output
-
-- Structured summaries (chunk, chapter, book)  
-- Page-referenced analysis  
-- Research-oriented interpretation  
-- Searchable text corpus (optional)  
+```python
+pdf_path = Path("your_file.pdf")
+```
 
 ---
 
-### Design Principles
+### 2. Run the pipeline
 
-- Preserve argument structure, not just content  
-- Maintain page-level traceability
-- Prioritize historiographical analysis
-- Use LLMs as analytical assistants, not replacements for reading  
-
----
-
-### Tech Stack (planned)
-
-- Python  
-- PyMuPDF (PDF extraction)  
-- Local LLM (via LM Studio or API)  
-- Possible: vector database (FAISS or similar)  
+```bash
+python main.py
+```
 
 ---
 
-### Use Case
+### 3. Output
 
-Designed for historians and researchers who need:
+Results will appear in:
 
-- Rapid orientation in large texts  
-- Structured analytical summaries  
-- Integration of books into ongoing research projects
+```
+output/
+```
+
+---
+
+## Design Philosophy
+
+- **Precision over fluency** – Avoid polished but inaccurate summaries
+- **Traceability** – Always anchor claims to page ranges
+- **Modularity** – Each component is independent and replaceable
+- **Local-first** – No dependency on external APIs
+
+---
+
+## Limitations
+
+- Requires OCR’d PDFs (no image-only scans)
+- Page-based chunking ignores deeper document structure (chapters/sections)
+- Quality depends on the underlying local model
+- Not a substitute for close reading
+
+---
+
+## Future Improvements
+
+- Better document classification (beyond page count)
+- Chapter/section-aware chunking
+- GUI or macOS app frontend
+- Integration with research tools (Zotero, Obsidian)
+- Multi-model pipelines (OCR → translation → summarization)
+
+---
+
+## Use Case
+
+Designed for researchers (especially historians) who need:
+
+- Rapid orientation in long texts
+- Structured, argument-aware summaries
+- Local, private processing of PDFs
+
+---
+
+## License
+
+MIT
