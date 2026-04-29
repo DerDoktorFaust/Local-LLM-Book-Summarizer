@@ -53,8 +53,8 @@ This project solves both by running entirely **locally** and using a **hierarchi
 
 The system automatically determines whether the PDF is:
 
-- **Article** (≤ ~80 pages)
-- **Book** (> ~80 pages)
+- **Article** (≤ ~40 pages)
+- **Book** (> ~40 pages)
 
 This decision controls the summarization pipeline.
 
