@@ -7,7 +7,7 @@ def write_markdown_output(
 ):
     lines = []
 
-    lines.append("# Book Summary\n")
+    lines.append("# Summary\n")
 
     lines.append("## Final Summary\n")
     lines.append(final_summary)

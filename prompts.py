@@ -122,3 +122,56 @@ Final summary:
 Intermediate summaries:
 {combined}
 """
+
+def article_final_summary_prompt(combined):
+    return f"""
+Based on the following chunk summaries, produce an analytical summary of the article.
+
+STRICT REQUIREMENTS:
+- Identify the article's thesis
+- Identify the article's historiographical intervention
+- Explain the structure of the argument
+- Track the main evidence
+- Every major claim must include page references
+- Do NOT make the article sound broader or more definitive than it is
+- Preserve qualifications, limits, and uncertainty
+
+Include:
+- Full citation-style title/author information if available in the text
+- One-sentence thesis
+- Main argument
+- Historiographical contribution
+- Structure of the article
+- Key evidence with page references
+- Important concepts
+- Limits, qualifications, or unresolved tensions
+
+Chunk summaries:
+{combined}
+"""
+
+
+def article_verification_prompt(final_summary, combined):
+    return f"""
+Evaluate the article summary against the chunk summaries.
+
+Check for:
+- Overstated thesis
+- Missing historiographical intervention
+- Missing evidence
+- Unsupported claims
+- Incorrect structure
+- Claims that need page references
+- Places where the summary makes the article sound broader than it is
+
+For each issue, include:
+- Problem
+- Why it is a problem
+- Suggested correction
+
+Final article summary:
+{final_summary}
+
+Chunk summaries:
+{combined}
+"""

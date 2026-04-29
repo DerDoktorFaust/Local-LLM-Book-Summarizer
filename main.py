@@ -3,6 +3,7 @@ from pathlib import Path
 
 from extractor import extract_pages
 from chunker import chunk_pages
+from classifier import classify_document
 from llm import load_model, unload_model
 
 from summarizer import (
@@ -10,7 +11,9 @@ from summarizer import (
     extract_compressed_notes,
     synthesize_batches,
     synthesize_final_summary,
-    verify_final_summary
+    verify_final_summary,
+    synthesize_article_summary,
+    verify_article_summary,
 )
 
 from writer import write_markdown_output
@@ -23,22 +26,28 @@ def main():
     pdf_path = Path("book.pdf")
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / "book_summary.md"
 
     try:
         print("Extracting...")
         pages = extract_pages(pdf_path)
 
+        total_pages = len(pages)
+        document_type = classify_document(total_pages)
+
+        output_path = output_dir / f"{document_type}_summary.md"
+
+        print(f"Document type: {document_type}")
+
         print("Chunking...")
         chunks = chunk_pages(pages)
 
-        total_pages = len(pages)
         total_chunks = len(chunks)
         total_chars = sum(len(c["text"]) for c in chunks)
         est_tokens = int(total_chars / 4)
 
         print("\n--- Pipeline Stats ---")
         print(f"Pages: {total_pages}")
+        print(f"Document type: {document_type}")
         print(f"Chunks: {total_chunks}")
         print(f"Estimated tokens: {est_tokens}")
 
@@ -94,47 +103,85 @@ def main():
             print(f"Slowest chunk: {max(chunk_times):.2f}s")
             print(f"Fastest chunk: {min(chunk_times):.2f}s")
 
-        print("\nSynthesizing batch summaries...")
+        if document_type == "article":
+            print("\nGenerating final article summary...")
 
-        try:
-            batch_summaries = synthesize_batches(chunk_summaries, batch_size=6)
-            print(f"Created {len(batch_summaries)} intermediate summaries")
-        except Exception as e:
-            print(f"Error generating batch summaries: {e}")
             batch_summaries = []
-            errors += 1
 
-        print("\nGenerating final book summary...")
-
-        try:
-            if batch_summaries:
-                final_summary = synthesize_final_summary(batch_summaries)
-            else:
+            try:
+                final_summary = synthesize_article_summary(chunk_summaries)
+            except Exception as e:
+                print(f"Error generating article summary: {e}")
                 final_summary = (
-                    "Final book-level summary failed because no batch summaries were created. "
+                    "Final article-level summary failed. "
                     "Chunk summaries were still generated successfully."
                 )
-        except Exception as e:
-            print(f"Error generating final summary: {e}")
-            final_summary = (
-                "Final book-level summary failed. "
-                "Chunk summaries and any completed batch summaries were still generated successfully."
-            )
-            errors += 1
+                errors += 1
 
-        print("\nVerifying final summary...")
+            print("\nVerifying final article summary...")
 
-        try:
-            if batch_summaries:
-                verification_report = verify_final_summary(final_summary, batch_summaries)
-            else:
-                verification_report = "Verification skipped because no batch summaries were created."
-        except Exception as e:
-            print(f"Error verifying final summary: {e}")
-            verification_report = (
-                "Verification failed. Review the final summary against the chunk and batch summaries manually."
-            )
-            errors += 1
+            try:
+                verification_report = verify_article_summary(
+                    final_summary,
+                    chunk_summaries,
+                )
+            except Exception as e:
+                print(f"Error verifying article summary: {e}")
+                verification_report = (
+                    "Verification failed. Review the final summary against "
+                    "the chunk summaries manually."
+                )
+                errors += 1
+
+        else:
+            print("\nSynthesizing batch summaries...")
+
+            try:
+                batch_summaries = synthesize_batches(chunk_summaries, batch_size=6)
+                print(f"Created {len(batch_summaries)} intermediate summaries")
+            except Exception as e:
+                print(f"Error generating batch summaries: {e}")
+                batch_summaries = []
+                errors += 1
+
+            print("\nGenerating final book summary...")
+
+            try:
+                if batch_summaries:
+                    final_summary = synthesize_final_summary(batch_summaries)
+                else:
+                    final_summary = (
+                        "Final book-level summary failed because no batch summaries "
+                        "were created. Chunk summaries were still generated successfully."
+                    )
+            except Exception as e:
+                print(f"Error generating final summary: {e}")
+                final_summary = (
+                    "Final book-level summary failed. "
+                    "Chunk summaries and any completed batch summaries were still "
+                    "generated successfully."
+                )
+                errors += 1
+
+            print("\nVerifying final book summary...")
+
+            try:
+                if batch_summaries:
+                    verification_report = verify_final_summary(
+                        final_summary,
+                        batch_summaries,
+                    )
+                else:
+                    verification_report = (
+                        "Verification skipped because no batch summaries were created."
+                    )
+            except Exception as e:
+                print(f"Error verifying final summary: {e}")
+                verification_report = (
+                    "Verification failed. Review the final summary against the chunk "
+                    "and batch summaries manually."
+                )
+                errors += 1
 
         print("\n--- Output ---")
         print(f"Final summary length (chars): {len(final_summary)}")

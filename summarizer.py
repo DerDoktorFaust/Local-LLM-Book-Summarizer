@@ -5,6 +5,8 @@ from prompts import (
     chunk_summary_prompt,
     final_summary_prompt,
     verification_prompt,
+    article_final_summary_prompt,
+    article_verification_prompt
 )
 
 
@@ -63,4 +65,25 @@ def verify_final_summary(final_summary, batch_summaries):
     )
 
     prompt = verification_prompt(final_summary, combined)
+    return generate_text(prompt)
+
+def synthesize_article_summary(chunk_summaries):
+    combined = "\n\n".join(
+        f"Pages {s['chunk']['start_page']}–{s['chunk']['end_page']}:\n"
+        f"{s['compressed_notes']}"
+        for s in chunk_summaries
+    )
+
+    prompt = article_final_summary_prompt(combined)
+    return generate_text(prompt)
+
+
+def verify_article_summary(final_summary, chunk_summaries):
+    combined = "\n\n".join(
+        f"Pages {s['chunk']['start_page']}–{s['chunk']['end_page']}:\n"
+        f"{s['compressed_notes']}"
+        for s in chunk_summaries
+    )
+
+    prompt = article_verification_prompt(final_summary, combined)
     return generate_text(prompt)
