@@ -1,4 +1,4 @@
-# Local LLM Book & Article Summarizer
+# Local LLM Pipeline for Book and Article Analysis
 
 ## Purpose
 
