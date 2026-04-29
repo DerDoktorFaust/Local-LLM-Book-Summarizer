@@ -110,17 +110,19 @@ output/book_summary.md output/article_summary.md
 ## Project Structure
 
 book-summarizer/
-├── main.py          # Pipeline orchestration
-├── llm.py           # Model loading and inference
-├── summarizer.py    # Summarization logic
-├── prompts.py       # All LLM prompts
-├── writer.py        # Markdown output
-├── extractor.py     # PDF text extraction
-├── chunker.py       # Chunking logic
-├── classifier.py    # (Planned) document classification
-├── input/
-├── output/
-└── requirements.txt
+─ main.py          # Pipeline orchestration
+─ llm.py           # Model loading and inference
+─ summarizer.py    # Summarization logic
+─ prompts.py       # All LLM prompts
+─ writer.py        # Markdown output
+─ extractor.py     # PDF text extraction
+─ chunker.py       # Chunking logic
+─ classifier.py    # (Planned) document classification
+─ input/
+─ output/
+─ logs/
+─ requirements.txt
+
 ---
 
 ## Installation
@@ -223,17 +225,6 @@ This format is designed for:
 - Quality depends heavily on the underlying local model
 - Smaller models may struggle with complex arguments
 - Not a substitute for close reading
-
----
-
-## Future Improvements
-
-- Robust document classification (beyond page count)
-- Chapter/section-aware chunking
-- Automatic bibliographic metadata extraction
-- GUI or macOS native app
-- Integration with research tools (Zotero, Obsidian)
-- Multi-model pipelines (OCR → translation → summarization)
 
 ---
 
