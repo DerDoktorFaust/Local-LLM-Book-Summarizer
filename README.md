@@ -18,7 +18,6 @@ This project solves both by running entirely locally and using a hierarchical su
 - Page-referenced outputs for traceability
 - Hierarchical summarization for long texts
 - Built-in verification pass to reduce hallucination and overstatement
-- Modular architecture for easy extension
 - Structured Markdown output with YAML front matter for reuse in research workflows
 
 ---
@@ -45,7 +44,7 @@ This project solves both by running entirely locally and using a hierarchical su
 - Each chunk includes:
   - start_page
   - end_page
-  - embedded page markers ([PAGE X] ... [/PAGE X])
+  - embedded page markers (`[PAGE X] ... [/PAGE X]`)
 - Ensures all summaries can be traced back to the original text
 
 ---
@@ -74,8 +73,6 @@ Chunks → Final Article Summary → Verification
 
 Chunks → Batch Summaries → Final Book Summary → Verification
 
-Batching prevents loss of coherence across long texts.
-
 ---
 
 ### 6. Verification Pass
@@ -103,37 +100,32 @@ Markdown file containing:
 
 Example output:
 
-output/book_summary.md output/article_summary.md
+```
+output/book_summary.md
+output/article_summary.md
+```
 
 ---
 
 ## Project Structure
 
+```
 book-summarizer/
-
-─ main.py          # Pipeline orchestration
-
-─ llm.py           # Model loading and inference
-
-─ summarizer.py    # Summarization logic
-
-─ prompts.py       # All LLM prompts
-
-─ writer.py        # Markdown output
-
-─ extractor.py     # PDF text extraction
-
-─ chunker.py       # Chunking logic
-
-─ classifier.py    # (Planned) document classification
-
-─ input/
-
-─ output/
-
-─ logs/
-
-─ requirements.txt
+├── main.py
+├── llm.py
+├── summarizer.py
+├── prompts.py
+├── writer.py
+├── extractor.py
+├── chunker.py
+├── classifier.py
+├── config.yaml
+├── config_loader.py
+├── input/
+├── output/
+├── logs/
+└── requirements.txt
+```
 
 ---
 
@@ -141,15 +133,39 @@ book-summarizer/
 
 ### 1. Clone the repository
 
-bash git clone https://github.com/YOUR_USERNAME/book-summarizer.git cd book-summarizer 
+```bash
+git clone https://github.com/YOUR_USERNAME/book-summarizer.git
+cd book-summarizer
+```
 
 ### 2. Create environment
 
-bash python3 -m venv venv source venv/bin/activate 
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
 ### 3. Install dependencies
 
-bash pip install -r requirements.txt 
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Configuration
+
+Before running the pipeline, you must create and edit `config.yaml`.
+
+### Example `config.yaml`
+
+```yaml
+model_path: /path/to/your/local/model
+```
+
+This must point to a valid MLX-compatible model on your system.
+
+If this file is missing or incorrect, the pipeline will fail.
 
 ---
 
@@ -157,52 +173,50 @@ bash pip install -r requirements.txt
 
 This project requires a locally running LLM compatible with Apple MLX.
 
-The pipeline does NOT use external APIs. You must have a model installed locally and configured in llm.py.
+The pipeline does NOT use external APIs.
 
 ### Requirements
 
 - Apple Silicon Mac (M-series recommended)
-- MLX-compatible model (e.g. Gemma, Qwen, etc.)
+- MLX-compatible model (e.g. Gemma, Qwen)
 - Model stored locally on your machine
-
-Example model path (set in llm.py):
-
-/Users/yourname/.lmstudio/models/mlx-community/your-model-name
 
 ### Important
 
 - The model is loaded directly in Python (no server required)
 - The model must fit in your available RAM
-- Performance and output quality depend heavily on the model you choose
-
-### Recommended Models
-
-- ~7B–12B parameter models for stability and speed
-- Larger models may exceed memory limits depending on your system
+- Performance and output quality depend heavily on the model
 
 ---
 
 ## Usage
 
-### 1. Run the pipeline
+### Run the pipeline
 
-bash python main.py yourfile.pdf 
-
-### 2. Output
-
-Results will appear in:
-
-output/
+```bash
+python main.py yourfile.pdf
+```
 
 ---
 
 ## Output Format
 
-Each .md file includes:
+Each `.md` file includes:
 
 ### YAML Front Matter
 
-yaml title: null author: null publication_year: null publisher_or_journal: null work_type: null source_file: yourfile.pdf model: your_model_path model_provider: null generated_at: timestamp pipeline_version: "0.1" 
+```yaml
+title: null
+author: null
+publication_year: null
+publisher_or_journal: null
+work_type: null
+source_file: yourfile.pdf
+model: your_model_path
+model_provider: null
+generated_at: timestamp
+pipeline_version: "0.1"
+```
 
 ### Structured Sections
 
@@ -211,43 +225,35 @@ yaml title: null author: null publication_year: null publisher_or_journal: null 
 - Intermediate Summaries
 - Chunk Summaries (with page ranges)
 
-This format is designed for:
-
-- Obsidian
-- DEVONthink
-- RAG pipelines
-- Future database integration
-
 ---
 
 ## Design Philosophy
 
-- Precision over fluency – Avoid polished but inaccurate summaries
-- Traceability – All claims tied to page ranges
-- Modularity – Each component is independent and replaceable
-- Local-first – No dependency on external APIs
-- Structured output – Designed for reuse in research workflows
+- Precision over fluency
+- Traceability through page references
+- Modular components
+- Local-first processing
+- Structured output for research workflows
 
 ---
 
 ## Limitations
 
 - Requires OCR’d PDFs (no image-only scans)
-- Page-based chunking ignores deeper document structure (chapters/sections)
-- Quality depends heavily on the underlying local model
-- Smaller models may struggle with complex arguments
+- Page-based chunking ignores deeper document structure
+- Quality depends on the underlying local model
 - Not a substitute for close reading
 
 ---
 
 ## Use Case
 
-Designed for researchers (especially historians) who need:
+Designed for researchers who need:
 
 - Rapid orientation in long texts
-- Structured, argument-aware summaries
-- Traceable claims with page references
-- Local, private processing of PDFs
+- Structured summaries of arguments
+- Traceable claims tied to page ranges
+- Local processing of PDFs
 
 ---
 
