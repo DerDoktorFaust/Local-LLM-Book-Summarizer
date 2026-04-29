@@ -5,7 +5,7 @@ from pathlib import Path
 from extractor import extract_pages
 from chunker import chunk_pages
 from classifier import classify_document
-from llm import load_model, unload_model
+from llm import load_model, unload_model, MODEL_PATH
 
 from summarizer import (
     summarize_chunk,
@@ -216,7 +216,9 @@ def main():
             verification_report=verification_report,
             batch_summaries=batch_summaries,
             chunk_summaries=chunk_summaries,
-            output_path=output_path
+            output_path=output_path,
+            source_file=pdf_path.name,
+            model_name=str(MODEL_PATH),
         )
 
         total_time = time.time() - start_time
